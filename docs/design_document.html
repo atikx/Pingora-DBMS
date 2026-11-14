@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pingora - Database Design Document (Group 26)</title>
+<style>
+  @page { size: A4; margin: 11mm 13mm 11mm 13mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 9.4pt; line-height: 1.3; color: #111; margin: 0; }
+  h1 { font-size: 17pt; margin: 0; color: #1f3864; }
+  .sub { color: #444; margin: 1px 0 5px; font-size: 8.6pt; }
+  h2 { font-size: 11.5pt; margin: 10px 0 3px; color: #1f3864; border-bottom: 1px solid #1f3864; padding-bottom: 1px; }
+  h3 { font-size: 8.8pt; margin: 5px 0 2px; }
+  p { margin: 2px 0 3px; }
+  ul, ol { margin: 2px 0 3px 15px; padding: 0; }
+  li { margin: 0 0 1px; }
+  table { border-collapse: collapse; width: 100%; margin: 3px 0 4px; }
+  th, td { border: 0.6px solid #666; padding: 1.4px 3.5px; vertical-align: top; text-align: left; }
+  th { background: #dce6f1; }
+  code { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 8.4pt; }
+  .two { display: flex; gap: 10px; }
+  .two > div { flex: 1; }
+  .fig { text-align: center; margin: 2px 0; }
+  .cap { font-size: 7.6pt; color: #444; text-align: center; margin: 0 0 3px; }
+  h2, h3 { break-after: avoid; }
+  .fig svg { width: 84%; height: auto; }
+  .small { font-size: 8.8pt; }
+  tr { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<h1>Pingora &mdash; Database Design Document</h1>
+<div class="sub">CS F212 DBMS &middot; Group 26 &middot; Final submission &middot; Repository: github.com/atikx/Pingora-DBMS (tag <b>final</b>)</div>
+<table class="small">
+  <tr><th>#</th><th>Team member</th><th>Student ID</th><th>#</th><th>Team member</th><th>Student ID</th></tr>
+  <tr><td>1</td><td>Atiksh Gupta</td><td>2024A8PS0500H</td><td>3</td><td>J. Bhanu Srikar</td><td>2024AAPS0241H</td></tr>
+  <tr><td>2</td><td>Sudhanshan Khandelwal</td><td>2024AAPS0255H</td><td>4</td><td>Nihal Ahmed Khan T A</td><td>2024A8PS0512H</td></tr>
+</table>
+
+<h2>1. Problem statement and application context</h2>
+<p>Pingora is a community publishing platform: authors publish (or schedule) posts, readers like and comment on them in nested threads, follow authors, and become administrators through a request-and-approval process. The case study is a small social-publishing application (in the spirit of a blog or news community) chosen because it needs a rich set of relationships (1:N, M:N and two recursive ones) and several business rules that the database itself should guarantee. All persistent data lives in PostgreSQL; the application is a thin layer over it.</p>
+<p><b>Intended users.</b> <i>Visitor</i> &mdash; reads, searches and filters posts. <i>Verified user</i> &mdash; likes, comments, subscribes, requests admin rights. <i>Administrator</i> &mdash; writes and schedules posts, reviews admin requests, views the analytics and the Integrity Lab.</p>
+
+<h2>2. Main requirements and workflows</h2>
+<ul>
+  <li><b>Functionality:</b> register with e-mail and OTP or Google sign-in; create posts (rich-text JSON, image, tags, category), publish now or at a scheduled time (cron every minute); browse, search and filter with sorting and pagination; like; comment and reply to any depth; subscribe to authors (e-mail on new post); request, approve or reject admin rights; analytics for admins; delete own posts.</li>
+  <li><b>Business rules enforced by the DBMS:</b> e-mail unique and well-formed; one like per user per post; one subscription per pair and never to oneself; non-blank title, comment and reason; views never negative; a scheduled post must have a publish time; a comment is never its own parent; OTP is a 6-digit number; request status is one of pending/approved/rejected; the platform always keeps at least one administrator.</li>
+</ul>
+<table>
+  <tr><th style="width:21%">End-to-end workflow</th><th style="width:17%">DBMS aspect</th><th>What happens in the database</th></tr>
+  <tr><td><b>1. Review an admin request</b> (Admin &rarr; Admin Requests)</td><td>Transaction</td><td><code>BEGIN</code>; lock the pending request (<code>SELECT &hellip; FOR UPDATE</code>); set it <i>approved</i>; set <code>users.isadmin = TRUE</code>; close the user's other pending requests; <code>COMMIT</code>. A <i>Test rollback</i> button runs the same statements, then fails on purpose: <code>ROLLBACK</code>, nothing is saved.</td></tr>
+  <tr><td><b>2. Analytics dashboard</b> (Admin &rarr; Reports)</td><td>Complex retrieval, views</td><td>Nine reports computed in SQL over five views: ranking (<code>RANK()</code>), top-N per category (<code>ROW_NUMBER() OVER PARTITION</code>), monthly trend (CTE, <code>FILTER</code>), <code>NOT EXISTS</code>, self-join. Each card shows its SQL.</td></tr>
+  <tr><td><b>3. Integrity Lab</b> (Admin &rarr; Reports)</td><td>Constraint enforcement</td><td>Eleven scenarios try to break a rule (duplicate like, self-subscribe, views = -5, orphan foreign key, bad enum, last-admin removal&hellip;) inside a transaction that is always rolled back; the page shows the SQLSTATE and constraint name raised by the database. In normal use the same errors reach users as friendly HTTP 409/400 responses.</td></tr>
+</table>
+
+<h2>3. ER / EER diagram</h2>
+<div class="fig">
+<svg viewBox="0 0 760 508" font-family="Arial, Helvetica, sans-serif" font-size="11.5">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#555"/></marker></defs>
+  <g fill="none" stroke="#555" stroke-width="1.25">
+    <path d="M380 174V210" marker-end="url(#a)"/><path d="M470 110H540" marker-end="url(#a)"/>
+    <path d="M540 215H470" marker-end="url(#a)"/><path d="M540 320H470" marker-end="url(#a)"/>
+    <path d="M625 300V222" marker-end="url(#a)"/><path d="M204 250H290" marker-end="url(#a)"/>
+    <path d="M204 290H290" marker-end="url(#a)"/><path d="M204 440H330V330" marker-end="url(#a)"/>
+    <path d="M710 340H732V385H710" marker-end="url(#a)"/>
+  </g>
+  <g stroke="#555" stroke-width="1.25" fill="#fff">
+    <rect x="290" y="210" width="180" height="120" rx="8" fill="#e3edf9" stroke="#2563eb" stroke-width="2"/>
+    <rect x="290" y="70" width="180" height="104" rx="8"/><rect x="540" y="70" width="170" height="152" rx="8"/>
+    <rect x="540" y="300" width="170" height="120" rx="8"/><rect x="24" y="216" width="180" height="120" rx="8"/>
+    <rect x="24" y="384" width="180" height="120" rx="8"/>
+  </g>
+  <g stroke="#ccc"><line x1="290" x2="470" y1="240" y2="240"/><line x1="290" x2="470" y1="100" y2="100"/><line x1="540" x2="710" y1="100" y2="100"/><line x1="540" x2="710" y1="330" y2="330"/><line x1="24" x2="204" y1="246" y2="246"/><line x1="24" x2="204" y1="414" y2="414"/></g>
+  <text x="24" y="34" font-size="14" font-weight="700" fill="#111">Every table links back to users, the hub of the schema (arrows: foreign key &rarr; referenced table)</text>
+  <g fill="#111" font-weight="700" font-size="13"><text x="302" y="234">users</text><text x="302" y="94">likes</text><text x="552" y="94">posts</text><text x="552" y="324">comments</text><text x="36" y="240">subscriptions</text><text x="36" y="408">admin_requests</text></g>
+  <g fill="#444">
+    <text x="302" y="256">PK id</text><text x="302" y="272">UQ email</text><text x="302" y="288">name, password, avatar</text><text x="302" y="304">isadmin, is_verified</text><text x="302" y="320">otp, created_at, updated_at</text>
+    <text x="302" y="116">PK id</text><text x="302" y="132">FK user_id &#8594; users</text><text x="302" y="148">FK post_id &#8594; posts</text><text x="302" y="164">UQ (user_id, post_id)</text>
+    <text x="552" y="116">PK id</text><text x="552" y="132">FK user_id &#8594; users</text><text x="552" y="148">title, description</text><text x="552" y="164">content JSONB</text><text x="552" y="180">tags[], category</text><text x="552" y="196">views, is_scheduled</text><text x="552" y="212">scheduled_at</text>
+    <text x="552" y="346">PK id</text><text x="552" y="362">FK user_id &#8594; users</text><text x="552" y="378">FK post_id &#8594; posts</text><text x="552" y="394">FK parent_id &#8594; comments</text><text x="552" y="410">content</text>
+    <text x="36" y="262">PK id</text><text x="36" y="278">FK user_id &#8594; users</text><text x="36" y="294">FK author_id &#8594; users</text><text x="36" y="310">UQ (user_id, author_id)</text><text x="36" y="326">CHECK no self-follow</text>
+    <text x="36" y="430">PK id</text><text x="36" y="446">FK user_id &#8594; users</text><text x="36" y="462">reason (NOT NULL)</text><text x="36" y="478">status (ENUM)</text><text x="36" y="494">created_at, updated_at</text>
+    <text x="388" y="196">M:N users-posts</text><text x="505" y="209" text-anchor="middle">publishes</text><text x="505" y="314" text-anchor="middle">writes</text><text x="633" y="266">has</text>
+    <text x="247" y="244" text-anchor="middle">subscriber</text><text x="247" y="284" text-anchor="middle">author</text><text x="214" y="434">submits</text><text x="540" y="440">replies to itself</text>
+  </g>
+</svg>
+</div>
+<div class="cap">Figure 1. Four entity sets (users, posts, comments, admin_requests); the M:N relationships LIKES and SUBSCRIBES_TO (recursive) become the relations <i>likes</i> and <i>subscriptions</i>; REPLIES_TO is recursive on comments.</div>
+<table class="small">
+  <tr><th>Relationship</th><th>Entities</th><th>Cardinality</th><th>Participation / implementation</th></tr>
+  <tr><td>PUBLISHES, WRITES</td><td>users&ndash;posts, users&ndash;comments</td><td>1:N</td><td>Total on the N side: <code>user_id NOT NULL</code></td></tr>
+  <tr><td>HAS</td><td>posts&ndash;comments</td><td>1:N</td><td>Total on comments: <code>post_id NOT NULL</code></td></tr>
+  <tr><td>REPLIES_TO</td><td>comments&ndash;comments</td><td>1:N (recursive)</td><td>Partial: <code>parent_id</code> NULL = top-level comment</td></tr>
+  <tr><td>LIKES</td><td>users&ndash;posts</td><td>M:N</td><td>Relation <i>likes</i>, own attribute <code>created_at</code>, UNIQUE (user_id, post_id)</td></tr>
+  <tr><td>SUBSCRIBES_TO</td><td>users&ndash;users</td><td>M:N (recursive)</td><td>Relation <i>subscriptions</i>, roles subscriber / author, UNIQUE pair</td></tr>
+  <tr><td>SUBMITS</td><td>users&ndash;admin_requests</td><td>1:N</td><td>Total on requests: <code>user_id NOT NULL</code></td></tr>
+</table>
+<p class="small"><b>Modelling notes.</b> No weak entities: comments depend on a post (existence dependency, cascade) but have their own surrogate key. No specialization: admin vs. regular user differ by one flag and no extra attributes, so a boolean replaces an ISA hierarchy. Multivalued attribute <i>tags</i> is stored as an array (see section 6 for the normalized alternative). Derived attributes (likes, comments, subscribers counts) are computed by views, never stored.</p>
+
+<h2>4. Relational schema, keys and integrity constraints</h2>
+<table class="small">
+  <tr><th style="width:12%">Relation</th><th>Attributes (type) &mdash; foreign keys marked FK</th><th style="width:20%">Keys</th></tr>
+  <tr><td><b>users</b></td><td>id UUID; name VARCHAR(255); email VARCHAR(255) NOT NULL; password TEXT; isadmin BOOLEAN NOT NULL; is_verified BOOLEAN; otp INTEGER; avatar TEXT; created_at, updated_at TIMESTAMP</td><td>PK id; AK email</td></tr>
+  <tr><td><b>posts</b></td><td>id UUID; user_id UUID NOT NULL (FK); title VARCHAR(255) NOT NULL; description TEXT NOT NULL; content JSONB NOT NULL; image TEXT NOT NULL; tags TEXT[]; category VARCHAR(50); views INTEGER NOT NULL; is_scheduled BOOLEAN NOT NULL; scheduled_at, created_at, updated_at TIMESTAMP</td><td>PK id; FK user_id &rarr; users</td></tr>
+  <tr><td><b>likes</b></td><td>id UUID; user_id UUID NOT NULL (FK); post_id UUID NOT NULL (FK); created_at TIMESTAMP</td><td>PK id; AK (user_id, post_id)</td></tr>
+  <tr><td><b>comments</b></td><td>id UUID; user_id UUID NOT NULL (FK); post_id UUID NOT NULL (FK); parent_id UUID (FK, self); content TEXT NOT NULL; created_at, updated_at TIMESTAMP</td><td>PK id; FKs users, posts, comments</td></tr>
+  <tr><td><b>subscriptions</b></td><td>id UUID; user_id UUID NOT NULL (FK, subscriber); author_id UUID NOT NULL (FK, author); created_at TIMESTAMP</td><td>PK id; AK (user_id, author_id)</td></tr>
+  <tr><td><b>admin_requests</b></td><td>id UUID; user_id UUID NOT NULL (FK); reason VARCHAR(500) NOT NULL; status request_status NOT NULL (ENUM); created_at, updated_at TIMESTAMP</td><td>PK id; FK user_id &rarr; users</td></tr>
+</table>
+<div class="two">
+<div>
+<h3>Integrity constraints enforced by PostgreSQL</h3>
+<table class="small">
+  <tr><th>Kind</th><th>Constraint and rule</th></tr>
+  <tr><td>PRIMARY KEY</td><td>UUID <code>id</code> in all 6 tables (<code>uuid_generate_v4()</code>)</td></tr>
+  <tr><td>FOREIGN KEY (9)</td><td>All <code>ON DELETE CASCADE</code>; all NOT NULL except <code>comments.parent_id</code></td></tr>
+  <tr><td>UNIQUE (3)</td><td><code>users.email</code>; <code>likes(user_id, post_id)</code>; <code>subscriptions(user_id, author_id)</code></td></tr>
+  <tr><td>ENUM</td><td><code>request_status</code>: pending, approved, rejected</td></tr>
+  <tr><td>CHECK (9)</td><td><code>chk_users_email_format</code>, <code>chk_users_otp_6_digits</code>, <code>chk_posts_title_not_blank</code>, <code>chk_posts_views_non_negative</code>, <code>chk_posts_schedule_has_time</code> (<i>is_scheduled = FALSE OR scheduled_at IS NOT NULL</i>), <code>chk_comments_content_not_blank</code>, <code>chk_comments_not_own_parent</code>, <code>chk_subscriptions_no_self</code>, <code>chk_admin_requests_reason_not_blank</code></td></tr>
+  <tr><td>TRIGGER</td><td>Last-admin rule (needs other rows, so not a CHECK); see section 7</td></tr>
+</table>
+</div>
+<div>
+<h3>Assumptions</h3>
+<ul class="small">
+  <li>Two kinds of account only, so the role is the boolean <code>isadmin</code>, not a roles table.</li>
+  <li>Deleting a user or post cascades to everything that depends on it.</li>
+  <li>Counts of likes, comments and subscribers are derived; <code>posts.views</code> is a stored counter because individual reads are not recorded.</li>
+  <li>A reply belongs to the same post as its parent; the application guarantees it (a composite foreign key would enforce it in the schema).</li>
+  <li>A scheduled post is hidden from every feed until <code>scheduled_at</code> passes.</li>
+  <li>Timestamps default to the DB clock; <code>updated_at</code> is maintained by triggers.</li>
+</ul>
+</div>
+</div>
+
+<h2>5. Normalization justification</h2>
+<table class="small">
+  <tr><th style="width:8%">Form</th><th>Argument for Pingora</th></tr>
+  <tr><td>1NF</td><td>Every relation has a key and atomic attributes, with two deliberate exceptions: <code>posts.tags TEXT[]</code> (labels with no attributes of their own) and <code>posts.content JSONB</code> (one rich-text document, always read and written whole).</td></tr>
+  <tr><td>2NF</td><td>Every primary key is a single surrogate column, so no partial dependency exists.</td></tr>
+  <tr><td>3NF</td><td>Only <code>user_id</code> is stored in posts, likes and comments &mdash; never the author's name, e-mail or avatar &mdash; so there is no transitive dependency post &rarr; author &rarr; author attributes (storing them would cause update and deletion anomalies).</td></tr>
+  <tr><td>BCNF</td><td>Candidate keys are {id} everywhere, plus {email} in users, {user_id, post_id} in likes and {user_id, author_id} in subscriptions; every determinant is a candidate key.</td></tr>
+</table>
+
+<h2>6. Design decisions, schema size and known trade-offs</h2>
+<ul class="small">
+  <li><b>Surrogate UUID keys</b> keep identifiers unguessable in URLs; M:N relations are separate tables with a UNIQUE pair so duplicates are impossible. Self-referencing <code>comments.parent_id</code> models unlimited nesting; a recursive CTE reads the tree.</li>
+  <li><b>Why six tables.</b> The domain has four entity sets and two M:N relationships, which map exactly to six relations; padding the schema with tables the application does not need would not improve the design. Our effort went into constraints, views, triggers, indexes and a transaction instead. We are aware of the scope guideline (8&ndash;12 tables) and document the five tables a fuller normalization would add.</li>
+  <li><b>Known weaknesses and the normalized alternative</b> (written as commented-out SQL in <code>schema.sql</code>, section 5): <i>tags</i> array &rarr; <code>tags</code> + <code>post_tags</code> (1NF); free-text <i>category</i> &rarr; <code>categories</code> + FK; <code>users.otp</code> (no expiry, one at a time) &rarr; <code>otp_codes</code>; stored <i>views</i> counter &rarr; <code>post_views</code>; e-mail-only alerts &rarr; <code>notifications</code>. Adopting them raises the schema from 6 to 11&ndash;12 relations. We kept the simple structures so the running application is unchanged, and we can demonstrate the improved design.</li>
+  <li><b>Other trade-offs:</b> a boolean role cannot record who approved whom (<code>reviewed_by</code> would); <code>ON DELETE CASCADE</code> is convenient but deletes content silently (soft delete is the alternative); the replies-to-same-post rule is not in the schema.</li>
+</ul>
+
+<h2>7. DBMS features implemented</h2>
+<table class="small">
+  <tr><th style="width:14%">Feature</th><th>Objects and purpose</th></tr>
+  <tr><td><b>Views (6)</b></td><td><code>post_stats</code> (likes, comments, engagement per post; counts in separate subqueries so joins do not multiply rows) &middot; <code>author_leaderboard</code> (view on a view, <code>RANK()</code>) &middot; <code>trending_posts</code> (<code>ROW_NUMBER() OVER PARTITION</code>) &middot; <code>comment_threads</code> (recursive CTE) &middot; <code>admin_request_overview</code> &middot; <code>user_activity_summary</code> (correlated subqueries). All are read by the Reports page.</td></tr>
+  <tr><td><b>Triggers (6)</b></td><td><code>set_updated_at()</code> on users, posts, comments, admin_requests (BEFORE UPDATE). <code>prevent_last_admin_loss()</code> on users (BEFORE UPDATE OF isadmin, BEFORE DELETE): raises SQLSTATE 23001 if no other admin exists; it locks the other admin rows (<code>FOR UPDATE</code>) so two concurrent demotions cannot both succeed.</td></tr>
+  <tr><td><b>Indexes (15)</b></td><td>B-tree and <i>partial</i> indexes for the feed (<code>WHERE is_scheduled = FALSE</code>), category pages, most-popular sort, the scheduler lookup, pending admin requests; foreign-key indexes (likes.post_id, comments.post_id/parent_id/user_id, subscriptions.author_id); GIN on <code>tags</code>; <b>trigram GIN</b> on title and description for <code>ILIKE '%text%'</code> search. On 50,000 posts, search drops from 29 ms to 0.5 ms and the category feed from 4.8 ms to 0.03 ms (<code>EXPLAIN ANALYZE</code>).</td></tr>
+  <tr><td><b>Transaction</b></td><td>Admin-request review (workflow 1): lock, three updates across two tables, <code>COMMIT</code> or <code>ROLLBACK</code>, on one pooled connection. The Integrity Lab also runs every scenario in <code>BEGIN &hellip; ROLLBACK</code>.</td></tr>
+  <tr><td><b>SQL queries</b></td><td>Eight showcase queries in <code>queries_demo.sql</code> (join/GROUP BY/HAVING, scalar subquery, NOT EXISTS, RANK/LEAD, recursive CTE, FILTER aggregation, view aggregation, self-join); nine more drive the Reports page.</td></tr>
+</table>
+
+<h2>8. Architecture, technology stack and UI overview</h2>
+<p><b>Architecture:</b> Browser &harr; React single-page app (:5173) &harr; Express REST API (:5000, JWT in an httpOnly cookie, parameterized SQL through a <code>pg</code> connection pool) &harr; PostgreSQL 17. Redis caches the public post listing; pgAdmin (:5050) is included for inspection. All five services run in one Docker Compose network; <code>schema.sql</code>, <code>views.sql</code> and <code>seed.sql</code> load automatically on first start. <b>Stack:</b> React (Vite, TypeScript), Zustand, TanStack Query, Tailwind CSS, shadcn/ui, Recharts; Node.js, Express; PostgreSQL 17 (<code>uuid-ossp</code>, <code>pg_trgm</code>, <code>pgcrypto</code>); Redis; Docker Compose.</p>
+<table class="small">
+  <tr><th style="width:21%">Screen</th><th style="width:30%">What the user does</th><th>Tables / DB features involved</th></tr>
+  <tr><td>Home, category, search</td><td>Browse feed, filter by category, search, sort, paginate</td><td>posts &#8904; users; partial and trigram indexes</td></tr>
+  <tr><td>Post page</td><td>Read, like, comment, reply (nested), subscribe to the author</td><td>posts (views+1), likes, comments (self-FK), subscriptions; UNIQUE and CHECK</td></tr>
+  <tr><td>Sign-in, OTP, profile</td><td>Register, verify, edit name/password/avatar</td><td>users (email UNIQUE, otp CHECK)</td></tr>
+  <tr><td>Liked posts, Subscriptions</td><td>List and remove own likes and follows</td><td>likes, subscriptions</td></tr>
+  <tr><td>New post, Your posts (admin)</td><td>Write, schedule, publish and delete posts</td><td>posts (schedule CHECK); cron publishes via one UPDATE</td></tr>
+  <tr><td>Admin Requests (admin)</td><td>Approve, reject, <i>Test rollback</i></td><td>Transaction on admin_requests and users; triggers</td></tr>
+  <tr><td>Reports: Analytics, Integrity Lab (admin)</td><td>View nine live reports with their SQL; run constraint-violation scenarios</td><td>Six views, CTEs, window functions; constraints and triggers</td></tr>
+</table>
+<p class="small"><b>Data and reproducibility.</b> <code>seed.sql</code> loads 851 rows (10 users, 50 posts, 500 nested comments, 221 likes, 50 subscriptions, 20 admin requests); all seeded users are verified admins (<code>1@1.1</code> &hellip; <code>10@10.10</code>, password <code>password123</code>). Setup: copy the two <code>.env.sample</code> files, run <code>docker compose up -d --build</code>; details and individual contributions are in the README.</p>
+
+</body>
+</html>

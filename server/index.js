@@ -6,6 +6,7 @@ import userRoutes from "./routes/user.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import generalRoutes from "./routes/general.routes.js";
 import verifiedUserRoutes from "./routes/verifiedUser.routes.js";
+import reportsRoutes from "./routes/reports.routes.js";
 import cron from "node-cron";
 import { scheduledPostUploader } from "./functions/scheduledPostUploader.js";
 import redis from "./redisClient.js";
@@ -23,6 +24,7 @@ app.use("/user", userRoutes);
 app.use("/admin", adminRoutes);
 app.use("/general", generalRoutes);
 app.use("/verifiedUser", verifiedUserRoutes);
+app.use("/reports", reportsRoutes);
 
 app.post("/", async (req, res) => {
   // await redis.set("key", "Hello Atiksh");

@@ -54,6 +54,7 @@ services:
       # Run once, on first start of an empty volume (alphabetical order)
       - ./server/schema/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./server/schema/views.sql:/docker-entrypoint-initdb.d/02-views.sql:ro
+      - ./server/schema/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s

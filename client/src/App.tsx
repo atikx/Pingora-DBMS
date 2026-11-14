@@ -6,6 +6,7 @@ import NewPost from "./pages/newPost/NewPost";
 import YourPosts from "./pages/yourPosts/YourPosts";
 import AddPostData from "./pages/addPostData/AddPostData";
 import AdminRequests from "./pages/adminRequests/AdminRequests";
+import Reports from "./pages/reports/Reports";
 
 import Home from "./pages/home/Home";
 import Auth from "./pages/login/Auth";
@@ -37,6 +38,7 @@ function App() {
           <Route path="/yourPosts" element={<YourPosts />} />
           <Route path="/addPostData" element={<AddPostData />} />
           <Route path="/adminRequests" element={<AdminRequests />} />
+          <Route path="/reports" element={<Reports />} />
         </Route>
 
         {/* protected routes only after login */}

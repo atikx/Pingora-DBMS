@@ -54,7 +54,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, Check, X, RefreshCw, Eye } from "lucide-react";
+import { ArrowUpDown, Check, X, RefreshCw, Eye, FlaskConical } from "lucide-react";
 import api from "@/lib/axiosinstance";
 import { toast } from "sonner";
 
@@ -142,7 +142,35 @@ export default function AdminRequests({
       }
       refetch();
     } catch (error: any) {
-      toast.error(error.response.message);
+      toast.error(error.response?.data?.message || "Something went wrong");
+      refetch();
+    }
+  };
+
+  // DEMO of a database TRANSACTION: the server approves the request, promotes the
+  // user and closes sibling requests, then deliberately fails and ROLLS BACK.
+  // The toast shows the state inside the transaction vs. after the rollback.
+  const handleTestRollback = async (requestId: string) => {
+    try {
+      await api.put("/admin/approveAdminRequest", {
+        id: requestId,
+        simulateFailure: true,
+      });
+    } catch (error: any) {
+      const d = error.response?.data;
+      if (d?.rolledBack) {
+        toast.warning("Transaction rolled back", {
+          description:
+            `Inside transaction: request "${d.insideTransaction.request_status}", ` +
+            `user admin = ${d.insideTransaction.user_is_admin}. ` +
+            `After rollback: request "${d.afterRollback.request_status}", ` +
+            `user admin = ${d.afterRollback.user_is_admin}. Nothing was saved.`,
+          duration: 12000,
+        });
+      } else {
+        toast.error(d?.message || "Something went wrong");
+      }
+      refetch();
     }
   };
 
@@ -290,6 +318,17 @@ export default function AdminRequests({
       header: "Actions",
       cell: ({ row }) => (
         <div className="flex space-x-1 md:space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            title="Demo: approve, then fail and roll back the transaction"
+            className="text-amber-600 border-amber-600 hover:bg-amber-50 text-xs md:text-sm px-2 md:px-3"
+            disabled={isProcessing || isPending}
+            onClick={() => handleTestRollback(row.original.request_id)}
+          >
+            <FlaskConical className="h-3 w-3 md:h-4 md:w-4 md:mr-1" />
+            <span className="hidden lg:inline">Test rollback</span>
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -460,6 +499,15 @@ export default function AdminRequests({
             </div>
           </div>
           <div className="flex space-x-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-amber-600 border-amber-600 hover:bg-amber-50"
+              disabled={isProcessing || isPending}
+              onClick={() => handleTestRollback(request.request_id)}
+            >
+              <FlaskConical className="h-4 w-4" />
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button

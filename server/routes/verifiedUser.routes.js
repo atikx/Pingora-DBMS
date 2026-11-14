@@ -4,6 +4,7 @@ import { queries } from "../queries/queries.js";
 import { authenticateVerifiedUserToken } from "../middlewares/jwtauth.js";
 const router = Router();
 import { limitTo10in1, limitTo1in1Day } from "../middlewares/rateLimiters.js";
+import { sendDbError } from "../functions/dbErrors.js";
 
 router.use(authenticateVerifiedUserToken);
 
@@ -33,6 +34,7 @@ router.post("/addComment", limitTo10in1, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    if (sendDbError(res, error)) return; // rule rejected by the database -> friendly 4xx
     return res.status(500).json({
       message: "Internal server error",
     });
@@ -88,6 +90,7 @@ router.post("/addSubscription", limitTo10in1, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    if (sendDbError(res, error)) return; // rule rejected by the database -> friendly 4xx
     return res.status(500).json({
       message: "Internal server error",
     });
@@ -166,6 +169,7 @@ router.post("/addLike", limitTo10in1, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    if (sendDbError(res, error)) return; // rule rejected by the database -> friendly 4xx
     return res.status(500).json({
       message: "Internal server error",
     });

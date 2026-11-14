@@ -1,79 +1,132 @@
+# Pingora
 
-# PINGORA
+**CS F212 Database Management Systems — Group 26 — Full-Stack Database Application**
 
-Welcome to Pingora — the simplest way to stay informed, share updates, and spark conversations within your community. Whether it's important announcements, event notices, or casual discussions, Pingora keeps everyone in the loop — fast, clear, and effortlessly. Built for connection, designed for clarity — Pingora is where your community thrives.
+Pingora is a community publishing platform. Users write and publish posts (optionally scheduled for later), like and comment on them (nested threads), subscribe to authors, and request administrator privileges through an approval process. All data lives in a PostgreSQL database; the application is a thin layer on top of it.
 
+## Team
 
-## Installation
+| # | Name | Student ID | Contribution |
+|---|------|-----------|--------------|
+| 1 | Atiksh Gupta | 2024A8PS0500H | _fill in_ |
+| 2 | Sudhanshan Khandelwal | 2024AAPS0255H | _fill in_ |
+| 3 | J. Bhanu Srikar | 2024AAPS0241H | _fill in_ |
+| 4 | Nihal Ahmed Khan T A | 2024A8PS0512H | _fill in_ |
 
-After clonning Open Terminal and run following command
+## Final submission
+
+| Item | Value |
+|---|---|
+| Git tag | `final` (the version submitted for evaluation) |
+| Code commit hash | `PASTE-HASH-HERE` (tag `final` is the next commit, which only records this hash) |
+| Database Design Document | [`docs/Pingora_Design_Document.pdf`](docs/Pingora_Design_Document.pdf) (4 pages; source `docs/design_document.html`) |
+| Demo Sheet | [`docs/Demo_Sheet_Group26.pdf`](docs/Demo_Sheet_Group26.pdf) (one page) |
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Front end | React (Vite, TypeScript), Zustand, TanStack Query, Tailwind CSS, shadcn/ui, Recharts |
+| Back end | Node.js (ES modules), Express REST API, `node-postgres` (`pg`) connection pool |
+| Database | PostgreSQL 17 (extensions: `uuid-ossp`, `pg_trgm`, `pgcrypto`) |
+| Other | Redis (response caching), Docker Compose, pgAdmin (database GUI for demo) |
+
+## Quick start (Docker)
 
 ```bash
-  cd ./client
-  npm i
-  npm run dev
+cp .env.sample .env                    # root .env (database password etc.)
+cp server/.env.sample server/.env      # server secrets; see notes below
+docker compose up -d --build
 ```
 
-Open new Terminal and run the following commands
+On the **first start with an empty database volume**, Postgres automatically runs, in order:
+
+1. `server/schema/schema.sql` — tables, constraints, indexes, triggers
+2. `server/schema/views.sql` — the six views
+3. `server/schema/seed.sql` — demo data (10 users, 50 posts, 500 comments, ...)
+
+| Service | URL |
+|---|---|
+| Web app | http://localhost:5173 |
+| API | http://localhost:5000 |
+| pgAdmin (database GUI, no login) | http://localhost:5050 |
+| PostgreSQL | `localhost:3001` (user `postgres`) |
+
+**Demo login** (all seeded users are verified admins): `1@1.1` … `10@10.10`, password `password123`.
+
+`server/.env` must contain at least: `DB_USER=postgres`, `DB_PASSWORD` (same as the root `.env`, default `postgres`), `DB_HOST=postgres`, `DB_PORT=5432`, `DB_NAME=postgres`, `PORT=5000`, `ACCESS_TOKEN_SECRET`, `CLIENT_URL=http://localhost:5173`, `REDIS_HOST=redis`, `REDIS_PORT=6379` (the API will not start without Redis), plus mail and Cloudinary keys if you want e-mails and image upload to work.
+
+### Re-creating the database
 
 ```bash
-  cd ./server
-  npm i
-  npm run dev
+docker compose down -v          # WARNING: deletes the database volume
+docker compose up -d
 ```
 
-Note: You Can also run the app with docker but you still have to install postgres in your system because I have used db outside of docker
+To reload only the demo data on a running database (this wipes posts, likes, comments, subscriptions and admin requests, never users):
 
-## Prerequisites (For using without Docker)
-
-Make sure you have the following installed:
-- Git (for clonning)
-- Node.js (v16 or higher)
-- npm 
-- PostGres
-
-  
-## Prerequisites (For using with Docker)
-
-Make sure you have the following installed:
-- Git (for clonning)
-- Docker Engine
-- PostGres
-
-## 📁 Project Structure
-```
-pingora/
-├── client/ # Frontend application
-├── server/ # Backend application
-└── README.md # This file
+```bash
+docker compose exec -T postgres psql -U postgres < server/schema/seed.sql
 ```
 
-## Tech Stack Used
+### Without Docker
 
-**Client:** React, Zustand, TailwindCSS, Shadcn, Casl
+Install PostgreSQL 14+, then:
 
-**Server:** Node, Express, Cloudinary
+```bash
+createdb pingora
+psql -d pingora -f server/schema/schema.sql
+psql -d pingora -f server/schema/views.sql
+psql -d pingora -f server/schema/seed.sql
+cd server && npm i && npm run dev        # needs Redis on localhost:6379
+cd client && npm i && npm run dev
+```
 
-**Db:** PostgreSQL 
+## Database design
 
+Six relations: `users`, `posts`, `likes`, `comments`, `subscriptions`, `admin_requests`.
+See the design document (final report) for the ER/EER diagram, relational mapping and normalization argument.
 
+| File | Contents |
+|---|---|
+| `server/schema/schema.sql` | Tables, PK/FK/UNIQUE/NOT NULL/CHECK, 15 indexes, 2 trigger functions (6 triggers); commented-out proposed normalized tables |
+| `server/schema/views.sql` | `post_stats`, `author_leaderboard`, `trending_posts`, `comment_threads`, `admin_request_overview`, `user_activity_summary` |
+| `server/schema/seed.sql` | Re-runnable demo data (deterministic) |
+| `server/schema/queries_demo.sql` | 8 showcase queries (join/group/having, subquery, NOT EXISTS, window functions, recursive CTE, ...) |
 
-## Features Implimented
+### DBMS features used
 
-- Image upload
-- Paginatio (werever required)
-- Content Sanitization in Editor
-- Markdown Support with realtime Preview of the Post
-- Option to Subscribe the author and get notified about new posts.
-- Option to like the posts and see all the liked posts.
-- Rate Limiting to prevent scams
--  Request caching in the frontend for expensive api requests 
-- Option to Schedule Post to get uploaded automaticaly on a particular time
-- Caching mechanism in server
-- Proper error handling with React Suspense Boundaries
-- Nested comments section
+| Feature | Where |
+|---|---|
+| Integrity constraints | PRIMARY KEY, FOREIGN KEY (`ON DELETE CASCADE`), UNIQUE, NOT NULL, CHECK (9 named), ENUM `request_status` |
+| Views (6) | `server/schema/views.sql`, read by the Reports page |
+| Triggers | `set_updated_at` on 4 tables; `prevent_last_admin_loss` (update + delete) |
+| Indexes (15) | B-tree, partial, GIN (arrays) and trigram GIN (`ILIKE '%text%'` search) |
+| Transactions | Admin-request review: `BEGIN` / lock / 3 updates / `COMMIT` or `ROLLBACK` (`server/routes/admin.routes.js`) |
+| Window functions, CTEs, recursive CTE, correlated subqueries | views and `queries_demo.sql` |
 
+## Major application workflows
 
+1. **Transaction — reviewing an admin request** (`Admin → Admin Requests`). Approve runs one transaction: lock the pending request (`SELECT ... FOR UPDATE`), mark it approved, promote the user, close the user's other pending requests, commit. The **Test rollback** button runs the same transaction, throws an error at the end and shows that every change was undone.
+2. **Reporting — analytics dashboard** (`Admin → Reports → Analytics`). Nine live reports computed by PostgreSQL views and queries, each with its SQL and the DBMS concept it demonstrates, plus charts.
+3. **Constraint enforcement — Integrity Lab** (`Admin → Reports → Integrity Lab`). Eleven scenarios try to break a rule (duplicate like, self-subscription, negative views, orphan foreign key, last admin removal, ...). Each runs in a transaction that is always rolled back; the page shows the SQLSTATE and constraint name the **database** raised. The same errors surface in normal use as friendly 4xx responses (for example, liking a post twice returns `409`).
+4. **Everyday flows** — register / OTP verify, write and schedule posts, like, nested comments, subscribe, search and filter with pagination.
+
+## Project structure
+
+```
+Pingora-DBMS/
+├── client/                React front end
+│   └── src/pages/reports/ Reports + Integrity Lab
+├── server/
+│   ├── routes/            Express routers (admin, reports, user, verifiedUser, general)
+│   ├── queries/queries.js All SQL used by the API, plus the report definitions
+│   ├── functions/         mailer, scheduler, DB-error mapping (dbErrors.js)
+│   └── schema/            schema.sql, views.sql, seed.sql, queries_demo.sql
+├── docker/pgadmin/        pgAdmin server registration
+├── docs/                  Design document (PDF) and Demo Sheet
+└── docker-compose.yml
+```
 
 ## Screenshots
 
@@ -105,17 +158,4 @@ pingora/
 
 9. New Post page
 ![App Screenshot](https://res.cloudinary.com/dae3h92th/image/upload/v1748852553/Screenshot_2025-06-02_135221_uamf9t.png)
-
-
-
-## My thoughts on Completion
-
-I have completed the project till STAGE-4 (which was the final stage) with implimenting each and every task mentioned in each stage.
-
-I have tried my best to follow all the mentioned good practises but I sill messed up with maintaining proper git comments and code uploads. I was supposed to use conventional commits but I didnt used them till half of the project. 
-
-But I think I have done the best I can considering the time (because I was also having CRUX inductions along with this induction)
-
-
-
 

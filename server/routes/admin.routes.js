@@ -12,6 +12,7 @@ import {
 } from "../functions/mailer.js";
 import { limitTo10in1, limitTo2in1 } from "../middlewares/rateLimiters.js";
 import { Filter } from "bad-words";
+import { sendDbError } from "../functions/dbErrors.js";
 
 const router = Router();
 const filter = new Filter();
@@ -33,7 +34,7 @@ router.post(
     } = req.body;
 
     if (content.blocks && content.blocks.length == 0) {
-      return res.send(300).send("post with no content cant be added");
+      return res.status(400).send("post with no content cant be added");
     }
 
     const { id, name, avatar } = req.admin;
@@ -285,44 +286,117 @@ router.get("/getAdminRequests", authenticateAdminToken, async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// WORKFLOW: review an admin request  (a multi-statement TRANSACTION)
+//
+//   BEGIN
+//     1. SELECT ... FOR UPDATE      lock the pending request (no double review)
+//     2. UPDATE admin_requests      status -> approved
+//     3. UPDATE users               isadmin -> TRUE
+//     4. UPDATE admin_requests      close the user's other pending requests
+//   COMMIT   (any error -> ROLLBACK: either ALL changes happen or NONE do)
+//
+// For the demo, { simulateFailure: true } throws after step 4 so the whole
+// transaction is rolled back; the response shows the state seen inside the
+// transaction and the state after the rollback.
+// ---------------------------------------------------------------------------
+class SimulatedFailure extends Error {}
+
 router.put(
   "/approveAdminRequest",
-  limitTo2in1,
+  limitTo10in1,
   authenticateAdminToken,
   async (req, res) => {
+    const { id, simulateFailure } = req.body;
+    const client = await pool.connect();
     try {
-      const { id } = req.body;
-      const { rows } = await pool.query(queries.approveAdminRequest, [id]);
-      if (rows.length === 0) {
-        return res.status(500).json({ message: "Internal server error" });
+      await client.query("BEGIN");
+
+      const locked = await client.query(queries.lockPendingAdminRequest, [id]);
+      if (locked.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return res
+          .status(409)
+          .json({ message: "Request not found or already reviewed" });
       }
+      const { user_id } = locked.rows[0];
+
+      await client.query(queries.setAdminRequestStatus, ["approved", id]);
+      const promoted = await client.query(queries.promoteUser, [user_id]);
+      const closed = await client.query(queries.closeSiblingAdminRequests, [
+        user_id,
+        id,
+      ]);
+
+      if (simulateFailure) {
+        const inside = await client.query(queries.getAdminRequestState, [id]);
+        throw Object.assign(new SimulatedFailure("Simulated failure"), {
+          inside: inside.rows[0],
+          changed: { requestsApproved: 1 + closed.rowCount, userPromoted: true },
+        });
+      }
+
+      await client.query("COMMIT");
       res.status(200).send("Request Approved Successfully");
-      const user = rows[0];
-      sendAdminApprovedMail(user.email, user.name);
+      const user = promoted.rows[0];
+      // e-mail is best-effort: a mail failure must never crash the API or undo the commit
+      sendAdminApprovedMail(user.email, user.name).catch((e) =>
+        console.error("approval e-mail failed:", e.message)
+      );
     } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      if (error instanceof SimulatedFailure) {
+        const after = await pool.query(queries.getAdminRequestState, [id]);
+        return res.status(500).json({
+          message:
+            "Simulated failure after all updates: transaction ROLLED BACK, nothing was saved.",
+          rolledBack: true,
+          insideTransaction: error.inside,
+          afterRollback: after.rows[0],
+          statementsUndone: error.changed,
+        });
+      }
       console.log("error accepting request", error);
+      if (sendDbError(res, error)) return;
       res.status(500).json({ message: "Internal server error" });
+    } finally {
+      client.release();
     }
   }
 );
 
 router.put(
   "/rejectAdminRequest",
-  limitTo2in1,
+  limitTo10in1,
   authenticateAdminToken,
   async (req, res) => {
+    const { id } = req.body;
+    const client = await pool.connect();
     try {
-      const { id } = req.body;
-      const { rows } = await pool.query(queries.rejectAdminRequest, [id]);
-      if (rows.length === 0) {
-        return res.status(500).json({ message: "Internal server error" });
+      await client.query("BEGIN");
+      const locked = await client.query(queries.lockPendingAdminRequest, [id]);
+      if (locked.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return res
+          .status(409)
+          .json({ message: "Request not found or already reviewed" });
       }
+      const { user_id } = locked.rows[0];
+      // Rejecting a request never changes the user's existing privileges.
+      await client.query(queries.setAdminRequestStatus, ["rejected", id]);
+      const user = await client.query(queries.getUserForRequest, [user_id]);
+      await client.query("COMMIT");
       res.status(200).send("Request Rejected Successfully");
-      const user = rows[0];
-      sendAdminRejectedMail(user.email, user.name);
+      sendAdminRejectedMail(user.rows[0].email, user.rows[0].name).catch((e) =>
+        console.error("rejection e-mail failed:", e.message)
+      );
     } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
       console.log("error rejecting request", error);
+      if (sendDbError(res, error)) return;
       res.status(500).json({ message: "Internal server error" });
+    } finally {
+      client.release();
     }
   }
 );

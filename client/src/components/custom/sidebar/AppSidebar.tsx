@@ -7,6 +7,7 @@ import {
   UsersIcon,
   Newspaper,
   PlusCircleIcon,
+  BarChart3,
 } from "lucide-react";
 
 import { NavDocuments } from "./nav-documents";
@@ -63,7 +64,12 @@ const data = {
       name: "Admin Requests",
       url: "/adminRequests",
       icon: Key,
-    }
+    },
+    {
+      name: "Reports",
+      url: "/reports",
+      icon: BarChart3,
+    },
   ],
 };
 
