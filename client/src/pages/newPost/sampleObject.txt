@@ -1,0 +1,85 @@
+{
+    "time": 1747162570182,
+    "blocks": [
+        {
+            "id": "ZY9UX002Hm",
+            "type": "embed",
+            "data": {
+                "service": "youtube",
+                "source": "https://youtu.be/pGFy_uGtpCA?feature=shared",
+                "embed": "https://www.youtube.com/embed/pGFy_uGtpCA?",
+                "width": 580,
+                "height": 320,
+                "caption": "Learn Everything in this vedio"
+            }
+        },
+        {
+            "id": "ZDWNOlIhhd",
+            "type": "header",
+            "data": {
+                "text": "Check List To learn web dev",
+                "level": 5
+            }
+        },
+        {
+            "id": "BIiZA39viC",
+            "type": "list",
+            "data": {
+                "style": "checklist",
+                "meta": {},
+                "items": [
+                    {
+                        "content": "HTML",
+                        "meta": {
+                            "checked": false
+                        },
+                        "items": []
+                    },
+                    {
+                        "content": "CSS",
+                        "meta": {
+                            "checked": false
+                        },
+                        "items": []
+                    },
+                    {
+                        "content": "JAVASCRIPT",
+                        "meta": {
+                            "checked": false
+                        },
+                        "items": []
+                    },
+                    {
+                        "content": "REACT JS",
+                        "meta": {
+                            "checked": false
+                        },
+                        "items": []
+                    },
+                    {
+                        "content": "NODE JS",
+                        "meta": {
+                            "checked": false
+                        },
+                        "items": []
+                    },
+                    {
+                        "content": "EXPRESS JS",
+                        "meta": {
+                            "checked": false
+                        },
+                        "items": []
+                    },
+                    {
+                        "content": "MONGO DB",
+                        "meta": {
+                            "checked": false
+                        },
+                        "items": []
+                    }
+                ]
+            }
+        }
+    ],
+    "version": "2.31.0-rc.7"
+}

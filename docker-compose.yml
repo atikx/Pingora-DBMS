@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - server
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    env_file:
+      - ./server/.env
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - redis
+      - postgres
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  postgres:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}   # fallback used only if DB_PASSWORD is not set in .env
+      POSTGRES_DB: postgres
+    ports:
+      - "3001:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Run once, on first start of an empty volume (alphabetical order)
+      - ./server/schema/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./server/schema/views.sql:/docker-entrypoint-initdb.d/02-views.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # DB GUI for demo/viva: http://localhost:5050 (no login; DB password = DB_PASSWORD, or "postgres" if unset)
+  pgadmin:
+    image: dpage/pgadmin4:8
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pingora.com
+      PGADMIN_DEFAULT_PASSWORD: ${DB_PASSWORD:-postgres}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgadmin-data:
+  redis-data:
+  postgres-data:

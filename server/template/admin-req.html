@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" style="margin: 0; padding: 0;">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Admin Access Request</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        background-color: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+      }
+
+      h2 {
+        color: #333333;
+        text-align: center;
+      }
+
+      p {
+        font-size: 16px;
+        color: #555555;
+        line-height: 1.6;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      li {
+        margin-bottom: 10px;
+      }
+
+      .reason-box {
+        background-color: #f0f0f0;
+        padding: 15px;
+        border-left: 4px solid #4a90e2;
+        border-radius: 6px;
+        margin-top: 10px;
+        font-style: italic;
+      }
+
+      .footer {
+        text-align: center;
+        margin-top: 40px;
+        font-size: 14px;
+        color: #888888;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Admin Access Request</h2>
+      <p>Hello Sir,</p>
+      <p>
+        A user has requested to become admin. Below are the details:
+      </p>
+      <ul>
+        <li><strong>Name:</strong> {{NAME}}</li>
+        <li><strong>Email:</strong> {{EMAIL}}</li>
+      </ul>
+
+      <p><strong>Reason for Request:</strong></p>
+      <div class="reason-box">
+        {{REASON}}
+      </div>
+
+      <p>
+        Please review the request and take appropriate action.
+      </p>
+
+      <div class="footer">
+        This is an automated message. Please do not reply directly to this email.
+      </div>
+    </div>
+  </body>
+</html>

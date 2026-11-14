@@ -1,0 +1,18 @@
+FROM node:20.16.0
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+ENV NODE_ENV=development
+ENV PORT=5000
+
+EXPOSE 5000
+
+RUN npm install -g nodemon
+
+CMD ["nodemon", "index.js"]

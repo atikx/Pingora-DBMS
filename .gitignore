@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Environment files and secrets (keep the *.sample templates)
+.env
+.env.*
+!.env.sample
+!.env.example
+**/.env
+**/.env.*
+!**/.env.sample
+!**/.env.example
+
+# Firebase service-account / admin credentials
+server/config/fire-base.json
+**/fire-base.json
+**/firebase-adminsdk*.json
+**/serviceAccount*.json
+**/service-account*.json
+
+# Uploaded temp files (multer)
+server/public/temp/*
+!server/public/temp/.gitkeep
+
+# Build output and logs
+dist/
+build/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

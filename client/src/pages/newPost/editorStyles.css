@@ -1,0 +1,22 @@
+/* @import "tailwindcss";
+@import "tw-animate-css";
+h1 {
+  @apply text-center font-bold;
+}
+
+
+ h3 {
+  @apply text-5xl text-center font-bold;
+}
+
+ h4 {
+  @apply text-4xl text-center font-bold;
+}
+
+h5 {
+  @apply text-3xl text-center font-bold;
+}
+
+ h6 {
+  @apply text-2xl text-center font-bold;
+} */
