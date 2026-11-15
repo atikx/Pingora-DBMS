@@ -18,7 +18,7 @@ Pingora is a community publishing platform. Users write and publish posts (optio
 | Item | Value |
 |---|---|
 | Git tag | `final` (the version submitted for evaluation) |
-| Code commit hash | `PASTE-HASH-HERE` (tag `final` is the next commit, which only records this hash) |
+| Code commit hash | `e799ec16703779c194943f097a0563c19a243967` (tag `final` is the next commit, which only records this hash) |
 | Database Design Document | [`docs/Pingora_Design_Document.pdf`](docs/Pingora_Design_Document.pdf) (4 pages; source `docs/design_document.html`) |
 | Demo Sheet | [`docs/Demo_Sheet_Group26.pdf`](docs/Demo_Sheet_Group26.pdf) (one page) |
 
