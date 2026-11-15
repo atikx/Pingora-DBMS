@@ -137,7 +137,7 @@ th { background:#dce6f1; font-weight: 700; }
       + table_html(['#', 'Query purpose', 'SQL concepts (join, group, subquery, CTE, etc.)', 'Source file : line', 'Workflow / screen'], queries) \
       + '<h2>C. Additional DBMS features (at least 3)</h2>' \
       + table_html(['#', 'Feature (transaction / view / trigger / procedure / index)', 'Object / function name', 'Source file : line', 'Purpose / effect'], features) \
-      + '<p class="note" style="margin-top:3px">Be prepared to demonstrate and explain the listed items during the viva. Setup: <b>docker compose up -d --build</b> (schema.sql, views.sql, seed.sql load automatically); login 1@1.1 / password123.</p>'
+      + '<p class="note" style="margin-top:3px">Setup: <b>docker compose up -d --build</b> (schema.sql, views.sql, seed.sql load automatically); login 1@1.1 / password123.</p>'
     open(OUT_HTML, 'w').write(page)
     subprocess.run(['google-chrome-stable', '--headless=new', '--no-sandbox', '--disable-gpu',
                     '--no-pdf-header-footer', '--print-to-pdf=' + OUT_PDF, 'file://' + OUT_HTML],
