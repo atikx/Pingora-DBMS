@@ -8,7 +8,7 @@ Pingora is a community publishing platform. Users write and publish posts (optio
 
 | # | Name | Student ID | Contribution |
 |---|------|-----------|--------------|
-| 1 | Atiksh Gupta | 2024A8PS0500H | Server-side and database code: PostgreSQL schema (keys, constraints, ENUMs, indexes), views, trigger, transactions, the Express REST API and the admin reports. Integration of all layers (client, API, database, Redis). |
+| 1 | Atiksh Gupta | 2024A8PS0500H | Server-side code and database code. Integration of all layers. |
 | 2 | Sudhanshan Khandelwal | 2024AAPS0255H | Testing of the application and database behaviour; ER/EER modelling. |
 | 3 | J. Bhanu Srikar | 2024AAPS0241H | Dockerisation (Docker Compose setup for the full stack) and Redis modelling. |
 | 4 | Nihal Ahmed Khan T A | 2024A8PS0512H | Client-side code (React front end). |
