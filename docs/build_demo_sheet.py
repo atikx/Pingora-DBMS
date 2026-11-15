@@ -17,7 +17,7 @@ LAB = sys.argv[2] if len(sys.argv) > 2 else '[lab section]'
 
 team = [
     'Group 26 / ' + LAB,
-    'Atiksh Gupta 2024A8PS0500H; Sudhanshan Khandelwal 2024AAPS0255H; '
+    'Atiksh Gupta 2024A8PS0500H; Sudhansh Khandelwal 2024AAPS0255H; '
     'J. Bhanu Srikar 2024AAPS0241H; Nihal Ahmed Khan T A 2024A8PS0512H',
     'github.com/atikx/Pingora-DBMS  |  tag: final  |  commit: ' + COMMIT,
 ]
